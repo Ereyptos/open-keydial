@@ -13,8 +13,8 @@ avec des profils par application, sans le pilote Huion.
 
 - Les 18 touches et le bouton central : raccourcis clavier, modificateurs maintenus tant que la touche est
   enfoncée (Ctrl, Shift, Alt), clics et molette de souris, touches multimédia, lancement d'un programme.
-- Modes de molette (zoom, taille du pinceau, historique, défilement… les tiens), changés avec le bouton
-  central, avec une petite bulle à l'écran.
+- Modes de molette (zoom, taille du pinceau, historique, défilement… les tiens, nommés comme tu veux),
+  changés avec le bouton central, avec une petite bulle à l'écran.
 - Profils par application : le profil Global s'applique partout, un profil d'application ne remplace que les
   touches qu'il définit. Le profil suit la fenêtre au premier plan.
 - Fenêtre de configuration : clique une touche sur le dessin (ou appuie dessus sur le Keydial) et enregistre

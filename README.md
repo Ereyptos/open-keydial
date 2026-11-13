@@ -13,8 +13,8 @@ with per-application profiles, without Huion's driver.
 
 - All 18 keys and the dial button: keyboard shortcuts, modifiers held while the key is held (Ctrl, Shift, Alt),
   mouse clicks and wheel, media keys, launching a program.
-- Dial modes (zoom, brush size, history, scroll... your own), cycled with the dial button, with a small
-  on-screen bubble.
+- Dial modes (zoom, brush size, history, scroll... your own, named as you like), cycled with the dial button,
+  with a small on-screen bubble.
 - Profiles per application: the Global profile applies everywhere, an application profile only replaces the keys
   it defines. The profile follows the window in the foreground.
 - Settings window: click a key on the drawing (or press it on the Keydial) and record the shortcut.

@@ -76,6 +76,35 @@ namespace OpenKeydial
 
         public void RemoveSection(string name) => Sections.RemoveAll(s => Str.Norm(s.Name) == Str.Norm(name));
 
+        public void RenameSection(string name, string newName)
+        {
+            if (Find(name) is Section s) s.Name = newName;
+        }
+
+        // Renames a dial mode everywhere it is referred to: its rotation actions ([Dial name]), the profiles'
+        // own rotation actions ("name.Clockwise") and the keys that switch to it ("DialMode:name").
+        // The [General] DialModes list is the caller's.
+        public void RenameDialMode(string old, string name)
+        {
+            if (Str.Norm(name) != Str.Norm(old)) RemoveSection(Config.DialPrefix + name);   // leftover of a removed mode
+            RenameSection(Config.DialPrefix + old, Config.DialPrefix + name);
+
+            string oldNorm = Str.Norm(old), prefix = Str.Norm(Config.ProfilePrefix);
+            string[] turns = { Str.Norm(Config.Clockwise), Str.Norm(Config.CounterClockwise) };
+            foreach (var s in Sections.Where(s => Str.Norm(s.Name).StartsWith(prefix)))
+                for (int k = 0; k < s.Entries.Count; k++)
+                {
+                    string key = s.Entries[k].Key, value = s.Entries[k].Value;
+                    int dot = key.LastIndexOf('.');
+                    if (dot > 0 && Str.Norm(key.Substring(0, dot)) == oldNorm && turns.Contains(Str.Norm(key.Substring(dot + 1))))
+                        key = name + key.Substring(dot);
+                    int colon = value.IndexOf(':');
+                    if (colon > 0 && Str.Norm(value.Substring(0, colon)) == "dialmode" && Str.Norm(value.Substring(colon + 1)) == oldNorm)
+                        value = value.Substring(0, colon + 1) + name;
+                    s.Entries[k] = new KeyValuePair<string, string>(key, value);
+                }
+        }
+
         public void Save(string path, string header)
         {
             var sb = new StringBuilder();
@@ -516,7 +545,7 @@ namespace OpenKeydial
         readonly KeypadControl keypad = new KeypadControl();
         readonly Label keyTitle = new Label { AutoSize = true, Font = Theme.Regular(10f), Margin = new Padding(3, 0, 3, 8) };
         readonly ActionEditor keyEditor = new ActionEditor();
-        readonly ListBox modes = new ListBox { Height = 150, Width = 180, IntegralHeight = false, Margin = new Padding(3, 3, 10, 3) };
+        readonly ListBox modes = new ListBox { Height = 180, Width = 180, IntegralHeight = false, Margin = new Padding(3, 3, 10, 3) };
         readonly ActionEditor cwEditor = new ActionEditor(), ccwEditor = new ActionEditor();
         readonly DarkCheck optReverse = new DarkCheck { AutoSize = true };
         readonly DarkCheck optOsd = new DarkCheck { AutoSize = true };
@@ -592,11 +621,12 @@ namespace OpenKeydial
             var modeRow = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Margin = new Padding(0, 6, 0, 10) };
             var modeButtons = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, AutoSize = true, WrapContents = false, Margin = new Padding(0) };
             var addMode = new Button { Text = L.T("Add…", "Ajouter…"), AutoSize = true };
+            var renameMode = new Button { Text = L.T("Rename…", "Renommer…"), AutoSize = true };
             var delMode = new Button { Text = L.T("Remove", "Supprimer"), AutoSize = true };
             var upMode = new Button { Text = L.T("Move up", "Monter"), AutoSize = true };
             var downMode = new Button { Text = L.T("Move down", "Descendre"), AutoSize = true };
-            foreach (var b in new[] { addMode, delMode, upMode, downMode }) { b.MinimumSize = new Size(116, 30); b.Margin = new Padding(0, 3, 0, 3); }
-            modeButtons.Controls.AddRange(new Control[] { addMode, delMode, upMode, downMode });
+            foreach (var b in new[] { addMode, renameMode, delMode, upMode, downMode }) { b.MinimumSize = new Size(116, 30); b.Margin = new Padding(0, 3, 0, 3); }
+            modeButtons.Controls.AddRange(new Control[] { addMode, renameMode, delMode, upMode, downMode });
             modeRow.Controls.AddRange(new Control[] { modes, modeButtons });
             dialFlow.Controls.AddRange(new Control[] {
                 new Label { Text = L.T("The dial button switches to the next mode, in this order.", "Le bouton central passe au mode suivant, dans cet ordre."), AutoSize = true, ForeColor = SystemColors.GrayText, MaximumSize = new Size(380, 0) },
@@ -636,6 +666,8 @@ namespace OpenKeydial
             cwEditor.Changed += () => { if (!loading && modes.SelectedItem is string m) { doc.Set(Config.DialPrefix + m, Config.Clockwise, cwEditor.Value ?? ""); MarkDirty(); } };
             ccwEditor.Changed += () => { if (!loading && modes.SelectedItem is string m) { doc.Set(Config.DialPrefix + m, Config.CounterClockwise, ccwEditor.Value ?? ""); MarkDirty(); } };
             addMode.Click += (s, e) => AddMode();
+            renameMode.Click += (s, e) => RenameMode();
+            modes.DoubleClick += (s, e) => RenameMode();
             delMode.Click += (s, e) => DeleteMode();
             upMode.Click += (s, e) => MoveMode(-1);
             downMode.Click += (s, e) => MoveMode(1);
@@ -749,6 +781,24 @@ namespace OpenKeydial
             doc.Set(Config.DialPrefix + name, Config.Clockwise, "");
             doc.Set(Config.DialPrefix + name, Config.CounterClockwise, "");
             SaveModeList(list, name);
+        }
+
+        void RenameMode()
+        {
+            if (!(modes.SelectedItem is string old)) return;
+            string name = Prompt(L.T("Rename the dial mode", "Renommer le mode de molette"), L.T("New name:", "Nouveau nom :"), old);
+            if (string.IsNullOrWhiteSpace(name)) return;
+            name = name.Trim().Replace(",", " ");
+            if (name == old) return;
+            var list = ModeList();
+            if (Str.Norm(name) != Str.Norm(old) && list.Any(m => Str.Norm(m) == Str.Norm(name))) { MessageBox.Show(this, L.T("This mode already exists.", "Ce mode existe déjà."), AppInfo.Name); return; }
+            int i = list.FindIndex(m => Str.Norm(m) == Str.Norm(old));
+            if (i < 0) return;
+            list[i] = name;
+            doc.RenameDialMode(old, name);
+            SaveModeList(list, name);
+            ShowKey();
+            keypad.Invalidate();
         }
 
         void DeleteMode()
